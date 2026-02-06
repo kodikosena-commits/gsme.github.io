@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <title>Online Τρίλιζα P2P</title>
+    <script src="https://unpkg.com"></script>
+    <style>
+        :root { --bg: #0f172a; --card: rgba(30, 41, 59, 0.7); --x: #f43f5e; --o: #38bdf8; --text: #f1f5f9; }
+        body { font-family: system-ui; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .container { background: var(--card); backdrop-filter: blur(10px); padding: 2rem; border-radius: 24px; border: 1px solid rgba(255,255,255,0.1); text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        .board { display: grid; grid-template-columns: repeat(3, 90px); gap: 10px; margin: 20px 0; }
+        .cell { width: 90px; height: 90px; background: rgba(15, 23, 42, 0.5); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; cursor: pointer; border: 1px solid rgba(255,255,255,0.05); transition: 0.2s; }
+        .cell.x { color: var(--x); text-shadow: 0 0 15px var(--x); }
+        .cell.o { color: var(--o); text-shadow: 0 0 15px var(--o); }
+        #status { font-size: 1.1rem; margin-bottom: 20px; color: #94a3b8; font-weight: 500; }
+        .setup { margin-bottom: 20px; font-size: 0.9rem; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; }
+        input { padding: 8px; border-radius: 8px; border: none; background: #334155; color: white; width: 140px; }
+        button { padding: 8px 16px; border-radius: 8px; border: none; background: var(--o); color: #0f172a; font-weight: 700; cursor: pointer; }
+        button:hover { filter: brightness(1.1); }
+    </style>
+</head>
+<body>
+
+    <h1>Τρίλιζα <span style="color:var(--o)">Online</span></h1>
+
+    <div class="container">
+        <div class="setup">
+            ID: <strong id="my-id" style="color:var(--o)">...</strong><br><br>
+            <input type="text" id="peer-id" placeholder="ID Φίλου">
+            <button onclick="connect()">Σύνδεση</button>
+        </div>
+
+        <div id="status">Περιμένω σύνδεση...</div>
+
+        <div class="board">
+            <div class="cell" onclick="tap(0)" id="c0"></div>
+            <div class="cell" onclick="tap(1)" id="c1"></div>
+            <div class="cell" onclick="tap(2)" id="c2"></div>
+            <div class="cell" onclick="tap(3)" id="c3"></div>
+            <div class="cell" onclick="tap(4)" id="c4"></div>
+            <div class="cell" onclick="tap(5)" id="c5"></div>
+            <div class="cell" onclick="tap(6)" id="c6"></div>
+            <div class="cell" onclick="tap(7)" id="c7"></div>
+            <div class="cell" onclick="tap(8)" id="c8"></div>
+        </div>
+        
+        <button onclick="location.reload()" style="background:#475569; color:white">Επανεκκίνηση</button>
+    </div>
+
+    <script>
+        const peer = new Peer();
+        let conn, me, turn = 'X', board = Array(9).fill(null);
+
+        peer.on('open', id => document.getElementById('my-id').innerText = id);
+        peer.on('connection', c => { conn = c; me = 'X'; init(); });
+
+        function connect() {
+            conn = peer.connect(document.getElementById('peer-id').value);
+            me = 'O'; init();
+        }
+
+        function init() {
+            document.getElementById('status').innerText = "Συνδέθηκε! Είσαι ο " + me;
+            conn.on('data', d => update(d.i, d.s));
+        }
+
+        function tap(i) {
+            if (!conn || board[i] || turn !== me) return;
+            update(i, me);
+            conn.send({ i: i, s: me });
+        }
+
+        function update(i, s) {
+            board[i] = s;
+            const el = document.getElementById('c' + i);
+            el.innerText = s;
+            el.classList.add(s.toLowerCase());
+            turn = (s === 'X') ? 'O' : 'X';
+            check();
+        }
+
+        function check() {
+            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for (let [a,b,c] of wins) {
+                if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+                    document.getElementById('status').innerText = "Νικητής: " + board[a];
+                    conn = null; return;
+                }
+            }
+            if (!board.includes(null)) document.getElementById('status').innerText = "Ισοπαλία!";
+            else document.getElementById('status').innerText = (turn === me ? "Σειρά σου!" : "Περίμενε...");
+        }
+    </script>
+</body>
+</html>
