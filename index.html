@@ -2,99 +2,155 @@
 <html lang="el">
 <head>
     <meta charset="UTF-8">
-    <title>Τρίλιζα Online v3.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ably Tic-Tac-Toe v4.0</title>
+    
+    <!-- Φόρτωση βιβλιοθήκης Ably (Έκδοση 1.2 για μέγιστη συμβατότητα) -->
     <script src="https://cdn.ably.com"></script>
+
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f0f2f5; padding: 20px; }
-        .setup-box { background: white; padding: 20px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .board { display: grid; grid-template-columns: repeat(3, 100px); gap: 5px; justify-content: center; margin-top: 20px; display: none; }
-        .cell { width: 100px; height: 100px; background: #fff; border: 2px solid #333; font-size: 2.5rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        #status { margin-top: 20px; font-weight: bold; color: #d9534f; }
-        input { padding: 10px; margin-bottom: 10px; width: 200px; }
-        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 400px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+        h1 { color: #333; margin-bottom: 5px; }
+        .info { font-size: 0.9rem; color: #666; margin-bottom: 20px; }
+        #setup { margin-bottom: 20px; }
+        input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; width: 80%; margin-bottom: 10px; outline: none; }
+        input:focus { border-color: #007bff; }
+        button { padding: 12px 25px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #0056b3; }
+        .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; display: none; }
+        .cell { aspect-ratio: 1/1; background: #fff; border: 2px solid #dee2e6; border-radius: 12px; font-size: 2.8rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; color: #333; }
+        .cell:hover { background: #f8f9fa; transform: scale(1.02); }
+        #status { margin-top: 20px; font-weight: bold; color: #007bff; min-height: 24px; padding: 10px; border-radius: 5px; }
+        .error { color: #dc3545 !important; background: #f8d7da; }
     </style>
 </head>
 <body>
 
-    <div class="setup-box" id="setup">
-        <h2>🎮 Είσοδος στο Παιχνίδι</h2>
-        <input type="text" id="roomInput" placeholder="Όνομα Δωματίου">
+<div class="container">
+    <h1>🎮 Online Τρίλιζα</h1>
+    <div class="info">Σύνδεση μέσω Ably Realtime</div>
+
+    <div id="setup">
+        <input type="text" id="roomInput" placeholder="Όνομα δωματίου (π.χ. mitsos1)">
         <br>
         <button onclick="startApp()">Σύνδεση & Έναρξη</button>
     </div>
 
-    <div id="status"></div>
+    <div id="status">Εισάγετε όνομα δωματίου για να ξεκινήσετε.</div>
 
-    <div class="board" id="board">
-        <div class="cell" onclick="sendMove(0)"></div>
-        <div class="cell" onclick="sendMove(1)"></div>
-        <div class="cell" onclick="sendMove(2)"></div>
-        <div class="cell" onclick="sendMove(3)"></div>
-        <div class="cell" onclick="sendMove(4)"></div>
-        <div class="cell" onclick="sendMove(5)"></div>
-        <div class="cell" onclick="sendMove(6)"></div>
-        <div class="cell" onclick="sendMove(7)"></div>
-        <div class="cell" onclick="sendMove(8)"></div>
+    <div class="board" id="gameBoard">
+        <div class="cell" onclick="handleCellClick(0)"></div>
+        <div class="cell" onclick="handleCellClick(1)"></div>
+        <div class="cell" onclick="handleCellClick(2)"></div>
+        <div class="cell" onclick="handleCellClick(3)"></div>
+        <div class="cell" onclick="handleCellClick(4)"></div>
+        <div class="cell" onclick="handleCellClick(5)"></div>
+        <div class="cell" onclick="handleCellClick(6)"></div>
+        <div class="cell" onclick="handleCellClick(7)"></div>
+        <div class="cell" onclick="handleCellClick(8)"></div>
     </div>
+</div>
 
-    <script>
-        // ΑΝ ΔΕΝ ΔΟΥΛΕΥΕΙ, ΦΤΙΑΞΕ ΕΝΑ ΝΕΟ KEY ΣΤΟ ABLY.COM
-        const ABLY_KEY = 'lvPZVg.F1b5GQ:VsS4kw48H7emnvy3udA7PmfmEuLU4UjLU24wi_kZt8M';
-        let ably, channel, mySymbol = null, currentPlayer = 'X', boardState = Array(9).fill(null);
+<script>
+    // ΠΡΟΣΟΧΗ: Αν το κλειδί έχει ακυρωθεί, φτιάξε νέο στο Ably Dashboard
+    const ABLY_KEY = 'lvPZVg.F1b5GQ:VsS4kw48H7emnvy3udA7PmfmEuLU4UjLU24wi_kZt8M';
+    
+    let ably, channel, mySymbol = null, currentPlayer = 'X', boardState = Array(9).fill(null);
 
-        function startApp() {
-            const room = document.getElementById('roomInput').value.trim();
-            if (!room) return alert("Δώσε όνομα δωματίου!");
+    function startApp() {
+        // 1. Έλεγχος αν η βιβλιοθήκη φορτώθηκε
+        if (typeof Ably === 'undefined') {
+            const status = document.getElementById('status');
+            status.innerText = "Σφάλμα: Η βιβλιοθήκη Ably δεν φορτώθηκε. Ελέγξτε τη σύνδεσή σας ή το AdBlock.";
+            status.className = "error";
+            return;
+        }
 
-            document.getElementById('status').innerText = "Προσπάθεια σύνδεσης...";
+        const room = document.getElementById('roomInput').value.trim();
+        if (!room) {
+            alert("Παρακαλώ δώστε ένα όνομα δωματίου!");
+            return;
+        }
 
-            // Αρχικοποίηση Ably με έλεγχο σφαλμάτων
-            ably = new Ably.Realtime({ key: ABLY_KEY });
+        document.getElementById('status').innerText = "Προσπάθεια σύνδεσης στο Ably...";
 
-            ably.connection.on('connected', () => {
-                console.log("Connected to Ably!");
-                document.getElementById('status').innerText = "Συνδέθηκε! Περιμένω κίνηση...";
-                document.getElementById('setup').style.display = 'none';
-                document.getElementById('board').style.display = 'grid';
-                
-                channel = ably.channels.get(room);
-                
-                channel.subscribe('move', (msg) => {
-                    const { index, symbol } = msg.data;
-                    renderMove(index, symbol);
-                });
+        // 2. Σύνδεση στο Ably
+        ably = new Ably.Realtime({ key: ABLY_KEY });
+
+        ably.connection.on('connected', () => {
+            console.log("Συνδέθηκε επιτυχώς!");
+            document.getElementById('status').innerText = "Συνδέθηκε! Περιμένω κίνηση...";
+            document.getElementById('setup').style.display = 'none';
+            document.getElementById('gameBoard').style.display = 'grid';
+            
+            channel = ably.channels.get(room);
+            
+            // Λήψη κινήσεων
+            channel.subscribe('move', (msg) => {
+                const { index, symbol } = msg.data;
+                processMove(index, symbol);
             });
+        });
 
-            ably.connection.on('failed', (err) => {
-                document.getElementById('status').innerText = "ΑΠΟΤΥΧΙΑ: " + err.message;
-                console.error("Connection failed:", err);
-            });
-        }
+        ably.connection.on('failed', (err) => {
+            const status = document.getElementById('status');
+            status.innerText = "Αποτυχία σύνδεσης: " + err.message;
+            status.className = "error";
+        });
+    }
 
-        function sendMove(index) {
-            if (boardState[index] || (mySymbol && mySymbol !== currentPlayer)) return;
-            if (!mySymbol) mySymbol = currentPlayer;
-            channel.publish('move', { index, symbol: currentPlayer });
-        }
+    function handleCellClick(index) {
+        // Αν το κελί είναι γεμάτο ή δεν είναι η σειρά μου
+        if (boardState[index] || (mySymbol && mySymbol !== currentPlayer)) return;
+        
+        // Ο πρώτος που παίζει σε ένα νέο παιχνίδι γίνεται 'X' ή 'O'
+        if (!mySymbol) mySymbol = currentPlayer;
 
-        function renderMove(index, symbol) {
-            const cells = document.querySelectorAll('.cell');
-            cells[index].innerText = symbol;
-            boardState[index] = symbol;
-            currentPlayer = (symbol === 'X') ? 'O' : 'X';
-            document.getElementById('status').innerText = `Σειρά του: ${currentPlayer} (Είσαι: ${mySymbol || '?'})`;
-            checkWinner();
-        }
+        // Στείλε την κίνηση
+        channel.publish('move', { index, symbol: mySymbol });
+    }
 
-        function checkWinner() {
-            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for (let [a, b, c] of wins) {
-                if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
-                    document.getElementById('status').innerText = "🎉 ΝΙΚΗΤΗΣ: " + boardState[a];
-                    document.getElementById('board').style.pointerEvents = 'none';
-                }
+    function processMove(index, symbol) {
+        if (boardState[index]) return;
+
+        const cells = document.querySelectorAll('.cell');
+        cells[index].innerText = symbol;
+        boardState[index] = symbol;
+        
+        // Αλλαγή σειράς
+        currentPlayer = (symbol === 'X') ? 'O' : 'X';
+        updateUI();
+        checkWinner();
+    }
+
+    function updateUI() {
+        const status = document.getElementById('status');
+        status.innerText = `Σειρά του: ${currentPlayer} | Εσείς είστε: ${mySymbol || '?'}`;
+        status.className = "";
+    }
+
+    function checkWinner() {
+        const wins = [
+            [0,1,2], [3,4,5], [6,7,8], // Οριζόντια
+            [0,3,6], [1,4,7], [2,5,8], // Κάθετα
+            [0,4,8], [2,4,6]           // Διαγώνια
+        ];
+        
+        for (let combo of wins) {
+            const [a, b, c] = combo;
+            if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
+                document.getElementById('status').innerText = "🎉 ΝΙΚΗΤΗΣ Ο " + boardState[a] + "!";
+                document.getElementById('gameBoard').style.pointerEvents = 'none';
+                return;
             }
         }
-    </script>
+        
+        if (!boardState.includes(null)) {
+            document.getElementById('status').innerText = "🤝 Ισοπαλία!";
+        }
+    }
+</script>
+
 </body>
 </html>
