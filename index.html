@@ -2,119 +2,82 @@
 <html lang="el">
 <head>
     <meta charset="UTF-8">
-    <title>P2P Tic-Tac-Toe</title>
-    <!-- Use a reliable CDN for PeerJS -->
-    <script src="https://cdn.jsdelivr.net"></script>
+    <title>Tic-Tac-Toe Online (Ably)</title>
+    <script src="https://cdn.ably.com"></script>
     <style>
-        :root { --bg: #0f172a; --x: #f43f5e; --o: #38bdf8; --text: #f1f5f9; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); text-align: center; padding: 20px; }
-        .setup-box { background: #1e293b; padding: 20px; border-radius: 15px; display: inline-block; border: 1px solid #334155; }
-        .board { display: grid; grid-template-columns: repeat(3, 90px); gap: 10px; justify-content: center; margin: 20px; }
-        .cell { width: 90px; height: 90px; background: #0f172a; border: 2px solid #334155; border-radius: 12px; font-size: 2.5rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
-        .cell.x { color: var(--x); text-shadow: 0 0 10px var(--x); }
-        .cell.o { color: var(--o); text-shadow: 0 0 10px var(--o); }
-        input { padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; margin: 5px; }
-        button { padding: 10px 20px; border-radius: 8px; border: none; background: var(--o); color: #0f172a; font-weight: bold; cursor: pointer; }
-        #status { margin: 20px; font-size: 1.2rem; color: var(--o); }
+        :root { --bg: #0f172a; --x: #f43f5e; --o: #38bdf8; }
+        body { font-family: sans-serif; background: var(--bg); color: white; text-align: center; }
+        .grid { display: grid; grid-template-columns: repeat(3, 90px); gap: 10px; justify-content: center; margin-top: 20px; }
+        .cell { width: 90px; height: 90px; background: #1e293b; border-radius: 12px; font-size: 2.5rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        #status { margin: 20px; color: var(--o); font-weight: bold; }
+        input { padding: 10px; border-radius: 5px; border: none; }
+        button { padding: 10px; background: var(--o); border: none; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <h1>Online Τρίλιζα</h1>
-
-    <div class="setup-box">
-        <p>1. Γράψε ένα <b>Όνομα Δωματίου</b> (π.χ. <i>mygame123</i>)</p>
-        <input type="text" id="room-name" placeholder="Όνομα Δωματίου...">
-        <button onclick="startServer()">Δημιουργία</button>
-        <hr style="border: 0.5px solid #334155; margin: 15px 0;">
-        <p>2. Ή γράψε το όνομα του φίλου σου για να μπεις:</p>
-        <button onclick="joinServer()">Σύνδεση σε Φίλο</button>
+    
+    <div>
+        <input type="text" id="room" placeholder="Όνομα Δωματίου">
+        <button onclick="join()">Σύνδεση</button>
     </div>
 
-    <div id="status">Περιμένω ενέργεια...</div>
+    <div id="status">Δώσε όνομα δωματίου για να παίξεις</div>
 
-    <div class="board" id="board">
-        <div class="cell" onclick="hit(0)" id="c0"></div>
-        <div class="cell" onclick="hit(1)" id="c1"></div>
-        <div class="cell" onclick="hit(2)" id="c2"></div>
-        <div class="cell" onclick="hit(3)" id="c3"></div>
-        <div class="cell" onclick="hit(4)" id="c4"></div>
-        <div class="cell" onclick="hit(5)" id="c5"></div>
-        <div class="cell" onclick="hit(6)" id="c6"></div>
-        <div class="cell" onclick="hit(7)" id="c7"></div>
-        <div class="cell" onclick="hit(8)" id="c8"></div>
+    <div class="grid">
+        <div class="cell" onclick="play(0)" id="c0"></div>
+        <div class="cell" onclick="play(1)" id="c1"></div>
+        <div class="cell" onclick="play(2)" id="c2"></div>
+        <div class="cell" onclick="play(3)" id="c3"></div>
+        <div class="cell" onclick="play(4)" id="c4"></div>
+        <div class="cell" onclick="play(5)" id="c5"></div>
+        <div class="cell" onclick="play(6)" id="c6"></div>
+        <div class="cell" onclick="play(7)" id="c7"></div>
+        <div class="cell" onclick="play(8)" id="c8"></div>
     </div>
 
     <script>
-        let peer, conn, mySym, turn = 'X', board = Array(9).fill(null);
+        // ΠΡΟΣΟΧΗ: Βάλε το δικό σου API KEY από το Ably dashboard εδώ:
+        const API_KEY = 'ΤΟ_ΔΙΚΟ_ΣΟΥ_API_KEY_ΕΔΩ'; 
+        
+        const ably = new Ably.Realtime(API_KEY);
+        let channel, mySym = null, board = Array(9).fill(null);
 
-        function startServer() {
-            const id = document.getElementById('room-name').value;
-            if(!id) return alert("Βάλε ένα όνομα!");
-            initPeer(id);
-            mySym = 'X';
-        }
+        function join() {
+            const roomName = document.getElementById('room').value;
+            if(!roomName) return alert("Βάλε όνομα!");
+            
+            channel = ably.channels.get(roomName);
+            document.getElementById('status').innerText = "Συνδέθηκες στο: " + roomName;
 
-        function joinServer() {
-            const id = document.getElementById('room-name').value;
-            if(!id) return alert("Βάλε το όνομα του δωματίου του φίλου!");
-            initPeer(null); // Joiners don't need a static ID
-            setTimeout(() => {
-                conn = peer.connect(id);
-                mySym = 'O';
-                setupGame();
-            }, 500);
-        }
-
-        function initPeer(id) {
-            peer = new Peer(id, {
-                config: {'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }]}
+            channel.subscribe('move', (msg) => {
+                updateUI(msg.data.index, msg.data.symbol);
             });
-
-            peer.on('open', () => {
-                document.getElementById('status').innerText = "Δωμάτιο έτοιμο! Πες στον φίλο σου να γράψει: " + (id || "το ID σου");
-            });
-
-            peer.on('connection', c => {
-                conn = c;
-                setupGame();
-            });
-
-            peer.on('error', err => alert("Σφάλμα: " + err.type));
         }
 
-        function setupGame() {
-            conn.on('open', () => {
-                document.getElementById('status').innerText = "Συνδέθηκε! Είσαι ο " + mySym;
-            });
-            conn.on('data', data => syncMove(data.i, data.s));
+        function play(i) {
+            if(!channel || board[i]) return;
+            if(!mySym) mySym = board.filter(x => x !== null).length === 0 ? 'X' : 'O';
+            
+            channel.publish('move', { index: i, symbol: mySym });
         }
 
-        function hit(i) {
-            if (!conn || board[i] || turn !== mySym) return;
-            syncMove(i, mySym);
-            conn.send({ i: i, s: mySym });
-        }
-
-        function syncMove(i, s) {
-            board[i] = s;
+        function updateUI(i, sym) {
+            board[i] = sym;
             const el = document.getElementById('c' + i);
-            el.innerText = s;
-            el.classList.add(s.toLowerCase());
-            turn = (s === 'X') ? 'O' : 'X';
-            check();
+            el.innerText = sym;
+            el.style.color = (sym === 'X') ? '#f43f5e' : '#38bdf8';
+            checkWin();
         }
 
-        function check() {
+        function checkWin() {
             const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
             for (let [a,b,c] of wins) {
                 if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-                    document.getElementById('status').innerText = "Νικητής: " + board[a] + "!";
-                    conn = null; return;
+                    document.getElementById('status').innerText = "ΝΙΚΗΤΗΣ: " + board[a];
                 }
             }
-            if (!board.includes(null)) document.getElementById('status').innerText = "Ισοπαλία!";
-            else document.getElementById('status').innerText = (turn === mySym ? "Σειρά σου!" : "Περίμενε...");
         }
     </script>
 </body>
