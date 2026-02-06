@@ -3,41 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ably Tic-Tac-Toe v4.0</title>
+    <title>Ably Tic-Tac-Toe v5.0</title>
     
-    <!-- Φόρτωση βιβλιοθήκης Ably (Έκδοση 1.2 για μέγιστη συμβατότητα) -->
-    <script src="https://cdn.ably.com"></script>
+    <!-- Εναλλακτική πηγή βιβλιοθήκης από Cloudflare που δεν μπλοκάρεται εύκολα -->
+    <script src="https://cdnjs.cloudflare.com"></script>
 
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 400px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
-        h1 { color: #333; margin-bottom: 5px; }
-        .info { font-size: 0.9rem; color: #666; margin-bottom: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #eef2f3; padding: 20px; }
+        .container { max-width: 400px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
         #setup { margin-bottom: 20px; }
-        input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; width: 80%; margin-bottom: 10px; outline: none; }
-        input:focus { border-color: #007bff; }
-        button { padding: 12px 25px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        button:hover { background: #0056b3; }
+        input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; width: 80%; margin-bottom: 10px; }
+        button { padding: 12px 25px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
         .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; display: none; }
-        .cell { aspect-ratio: 1/1; background: #fff; border: 2px solid #dee2e6; border-radius: 12px; font-size: 2.8rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; color: #333; }
-        .cell:hover { background: #f8f9fa; transform: scale(1.02); }
-        #status { margin-top: 20px; font-weight: bold; color: #007bff; min-height: 24px; padding: 10px; border-radius: 5px; }
-        .error { color: #dc3545 !important; background: #f8d7da; }
+        .cell { aspect-ratio: 1/1; background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 12px; font-size: 2.5rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        #status { margin-top: 20px; font-weight: bold; color: #007bff; min-height: 24px; padding: 10px; }
+        .error { color: #dc3545 !important; background: #f8d7da; border-radius: 5px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>🎮 Online Τρίλιζα</h1>
-    <div class="info">Σύνδεση μέσω Ably Realtime</div>
+    <p style="font-size: 0.8rem; color: #888;">Version 5.0 (Cloudflare Lib)</p>
 
     <div id="setup">
-        <input type="text" id="roomInput" placeholder="Όνομα δωματίου (π.χ. mitsos1)">
+        <input type="text" id="roomInput" placeholder="Όνομα δωματίου">
         <br>
         <button onclick="startApp()">Σύνδεση & Έναρξη</button>
     </div>
 
-    <div id="status">Εισάγετε όνομα δωματίου για να ξεκινήσετε.</div>
+    <div id="status">Περιμένω είσοδο...</div>
 
     <div class="board" id="gameBoard">
         <div class="cell" onclick="handleCellClick(0)"></div>
@@ -53,104 +48,74 @@
 </div>
 
 <script>
-    // ΠΡΟΣΟΧΗ: Αν το κλειδί έχει ακυρωθεί, φτιάξε νέο στο Ably Dashboard
+    // ΠΡΟΣΟΧΗ: Αν το κλειδί σου έχει ακυρωθεί από το Ably, βάλε ένα νέο εδώ
     const ABLY_KEY = 'lvPZVg.F1b5GQ:VsS4kw48H7emnvy3udA7PmfmEuLU4UjLU24wi_kZt8M';
     
     let ably, channel, mySymbol = null, currentPlayer = 'X', boardState = Array(9).fill(null);
 
     function startApp() {
-        // 1. Έλεγχος αν η βιβλιοθήκη φορτώθηκε
+        // Έλεγχος αν φορτώθηκε η βιβλιοθήκη από το Cloudflare
         if (typeof Ably === 'undefined') {
-            const status = document.getElementById('status');
-            status.innerText = "Σφάλμα: Η βιβλιοθήκη Ably δεν φορτώθηκε. Ελέγξτε τη σύνδεσή σας ή το AdBlock.";
-            status.className = "error";
+            document.getElementById('status').innerText = "Σφάλμα: Η βιβλιοθήκη Ably μπλοκάρεται ακόμα. Δοκίμασε Incognito mode.";
+            document.getElementById('status').className = "error";
             return;
         }
 
         const room = document.getElementById('roomInput').value.trim();
-        if (!room) {
-            alert("Παρακαλώ δώστε ένα όνομα δωματίου!");
-            return;
-        }
+        if (!room) return alert("Δώσε όνομα δωματίου!");
 
-        document.getElementById('status').innerText = "Προσπάθεια σύνδεσης στο Ably...";
+        document.getElementById('status').innerText = "Σύνδεση...";
 
-        // 2. Σύνδεση στο Ably
+        // Σύνδεση
         ably = new Ably.Realtime({ key: ABLY_KEY });
 
         ably.connection.on('connected', () => {
-            console.log("Συνδέθηκε επιτυχώς!");
             document.getElementById('status').innerText = "Συνδέθηκε! Περιμένω κίνηση...";
             document.getElementById('setup').style.display = 'none';
             document.getElementById('gameBoard').style.display = 'grid';
             
             channel = ably.channels.get(room);
-            
-            // Λήψη κινήσεων
             channel.subscribe('move', (msg) => {
-                const { index, symbol } = msg.data;
-                processMove(index, symbol);
+                processMove(msg.data.index, msg.data.symbol);
             });
         });
 
         ably.connection.on('failed', (err) => {
-            const status = document.getElementById('status');
-            status.innerText = "Αποτυχία σύνδεσης: " + err.message;
-            status.className = "error";
+            document.getElementById('status').innerText = "Σφάλμα Key: " + err.message;
+            document.getElementById('status').className = "error";
         });
     }
 
     function handleCellClick(index) {
-        // Αν το κελί είναι γεμάτο ή δεν είναι η σειρά μου
         if (boardState[index] || (mySymbol && mySymbol !== currentPlayer)) return;
-        
-        // Ο πρώτος που παίζει σε ένα νέο παιχνίδι γίνεται 'X' ή 'O'
         if (!mySymbol) mySymbol = currentPlayer;
-
-        // Στείλε την κίνηση
         channel.publish('move', { index, symbol: mySymbol });
     }
 
     function processMove(index, symbol) {
         if (boardState[index]) return;
-
         const cells = document.querySelectorAll('.cell');
         cells[index].innerText = symbol;
         boardState[index] = symbol;
-        
-        // Αλλαγή σειράς
         currentPlayer = (symbol === 'X') ? 'O' : 'X';
         updateUI();
         checkWinner();
     }
 
     function updateUI() {
-        const status = document.getElementById('status');
-        status.innerText = `Σειρά του: ${currentPlayer} | Εσείς είστε: ${mySymbol || '?'}`;
-        status.className = "";
+        document.getElementById('status').innerText = `Σειρά: ${currentPlayer} | Είσαι: ${mySymbol || '?'}`;
     }
 
     function checkWinner() {
-        const wins = [
-            [0,1,2], [3,4,5], [6,7,8], // Οριζόντια
-            [0,3,6], [1,4,7], [2,5,8], // Κάθετα
-            [0,4,8], [2,4,6]           // Διαγώνια
-        ];
-        
+        const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
         for (let combo of wins) {
             const [a, b, c] = combo;
             if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
-                document.getElementById('status').innerText = "🎉 ΝΙΚΗΤΗΣ Ο " + boardState[a] + "!";
+                document.getElementById('status').innerText = "🎉 ΝΙΚΗΤΗΣ: " + boardState[a];
                 document.getElementById('gameBoard').style.pointerEvents = 'none';
-                return;
             }
-        }
-        
-        if (!boardState.includes(null)) {
-            document.getElementById('status').innerText = "🤝 Ισοπαλία!";
         }
     }
 </script>
-
 </body>
 </html>
