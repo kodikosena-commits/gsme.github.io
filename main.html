@@ -2,105 +2,104 @@
 <html lang="el">
 <head>
     <meta charset="UTF-8">
-    <title>Online Τρίλιζα P2P</title>
-    <script src="https://unpkg.com"></script>
- 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ably Tic-Tac-Toe v2.0</title>
+    <script src="https://cdn.ably.com"></script>
     <style>
-        :root { --bg: #0f172a; --card: rgba(30, 41, 59, 0.7); --x: #f43f5e; --o: #38bdf8; --text: #f1f5f9; }
-        body { font-family: system-ui; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .container { background: var(--card); backdrop-filter: blur(10px); padding: 2rem; border-radius: 24px; border: 1px solid rgba(255,255,255,0.1); text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
-        .board { display: grid; grid-template-columns: repeat(3, 90px); gap: 10px; margin: 20px 0; }
-        .cell { width: 90px; height: 90px; background: rgba(15, 23, 42, 0.5); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; cursor: pointer; border: 1px solid rgba(255,255,255,0.05); transition: 0.2s; }
-        .cell.x { color: var(--x); text-shadow: 0 0 15px var(--x); }
-        .cell.o { color: var(--o); text-shadow: 0 0 15px var(--o); }
-        #status { font-size: 1.1rem; margin-bottom: 20px; color: #94a3b8; font-weight: 500; }
-        .setup { margin-bottom: 20px; font-size: 0.9rem; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; }
-        input { padding: 8px; border-radius: 8px; border: none; background: #334155; color: white; width: 140px; }
-        button { padding: 8px 16px; border-radius: 8px; border: none; background: var(--o); color: #0f172a; font-weight: 700; cursor: pointer; }
-        button:hover { filter: brightness(1.1); }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #eef2f3; padding: 20px; }
+        .container { max-width: 400px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #333; font-size: 1.5rem; }
+        .version { font-size: 0.8rem; color: #888; margin-bottom: 20px; }
+        #setup { margin-bottom: 20px; }
+        input { padding: 10px; border: 1px solid #ddd; border-radius: 5px; width: 70%; margin-bottom: 10px; }
+        button { padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #218838; }
+        .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; display: none; }
+        .cell { aspect-ratio: 1/1; background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 10px; font-size: 2.5rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
+        .cell:hover { background: #e9ecef; }
+        #status { margin-top: 20px; font-weight: bold; color: #007bff; min-height: 24px; }
+        .reset-btn { background: #dc3545; margin-top: 20px; display: none; }
     </style>
 </head>
 <body>
 
-    <h1>Τρίλιζα <span style="color:var(--o)">Online</span></h1>
+<div class="container">
+    <h1>🎮 Online Τρίλιζα</h1>
+    <div class="version">Έκδοση 2.0 (GitHub Live)</div>
 
-    <div class="container">
-        <div class="setup">
-            ID: <strong id="my-id" style="color:var(--o)">...</strong><br><br>
-            <input type="text" id="peer-id" placeholder="ID Φίλου">
-            <button onclick="connect()">Σύνδεση</button>
-        </div>
-
-        <div id="status">Περιμένω σύνδεση...</div>
-
-        <div class="board">
-            <div class="cell" onclick="tap(0)" id="c0"></div>
-            <div class="cell" onclick="tap(1)" id="c1"></div>
-            <div class="cell" onclick="tap(2)" id="c2"></div>
-            <div class="cell" onclick="tap(3)" id="c3"></div>
-            <div class="cell" onclick="tap(4)" id="c4"></div>
-            <div class="cell" onclick="tap(5)" id="c5"></div>
-            <div class="cell" onclick="tap(6)" id="c6"></div>
-            <div class="cell" onclick="tap(7)" id="c7"></div>
-            <div class="cell" onclick="tap(8)" id="c8"></div>
-        </div>
-        
-        <button onclick="location.reload()" style="background:#475569; color:white">Επανεκκίνηση</button>
+    <div id="setup">
+        <input type="text" id="roomName" placeholder="Όνομα δωματίου π.χ. hellas">
+        <br>
+        <button onclick="connect()">Είσοδος στο Παιχνίδι</button>
     </div>
 
-    <script>
-          const peer = new Peer({
-    config: { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }] }
-});
+    <div id="status">Δώσε όνομα δωματίου για να συνδεθείς</div>
 
-// Display your ID so you can send it to a friend
-peer.on('open', (id) => {
-    console.log('My peer ID is: ' + id);
-    // Show this ID on your website so a friend can use it
-});
-        const peer = new Peer();
-        let conn, me, turn = 'X', board = Array(9).fill(null);
+    <div class="board" id="gameBoard">
+        <div class="cell" onclick="makeMove(0)"></div>
+        <div class="cell" onclick="makeMove(1)"></div>
+        <div class="cell" onclick="makeMove(2)"></div>
+        <div class="cell" onclick="makeMove(3)"></div>
+        <div class="cell" onclick="makeMove(4)"></div>
+        <div class="cell" onclick="makeMove(5)"></div>
+        <div class="cell" onclick="makeMove(6)"></div>
+        <div class="cell" onclick="makeMove(7)"></div>
+        <div class="cell" onclick="makeMove(8)"></div>
+    </div>
 
-        peer.on('open', id => document.getElementById('my-id').innerText = id);
-        peer.on('connection', c => { conn = c; me = 'X'; init(); });
+    <button class="reset-btn" id="resetBtn" onclick="location.reload()">Νέο Παιχνίδι</button>
+</div>
 
-        function connect() {
-            conn = peer.connect(document.getElementById('peer-id').value);
-            me = 'O'; init();
-        }
+<script>
+    const ABLY_KEY = 'lvPZVg.F1b5GQ:VsS4kw48H7emnvy3udA7PmfmEuLU4UjLU24wi_kZt8M';
+    let ably, channel, mySymbol = null, currentPlayer = 'X', boardState = Array(9).fill(null);
 
-        function init() {
-            document.getElementById('status').innerText = "Συνδέθηκε! Είσαι ο " + me;
-            conn.on('data', d => update(d.i, d.s));
-        }
+    function connect() {
+        const room = document.getElementById('roomName').value.trim();
+        if (!room) return alert("Βάλε ένα όνομα!");
 
-        function tap(i) {
-            if (!conn || board[i] || turn !== me) return;
-            update(i, me);
-            conn.send({ i: i, s: me });
-        }
+        ably = new Ably.Realtime(ABLY_KEY);
+        channel = ably.channels.get(room);
 
-        function update(i, s) {
-            board[i] = s;
-            const el = document.getElementById('c' + i);
-            el.innerText = s;
-            el.classList.add(s.toLowerCase());
-            turn = (s === 'X') ? 'O' : 'X';
-            check();
-        }
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('gameBoard').style.display = 'grid';
+        document.getElementById('status').innerText = "Συνδέθηκε! Περιμένω κίνηση...";
 
-        function check() {
-            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for (let [a,b,c] of wins) {
-                if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-                    document.getElementById('status').innerText = "Νικητής: " + board[a];
-                    conn = null; return;
-                }
+        channel.subscribe('move', (msg) => {
+            const { index, symbol } = msg.data;
+            const cells = document.querySelectorAll('.cell');
+            cells[index].innerText = symbol;
+            boardState[index] = symbol;
+            currentPlayer = (symbol === 'X') ? 'O' : 'X';
+            checkWin();
+            updateStatus();
+        });
+    }
+
+    function makeMove(index) {
+        if (boardState[index] || (mySymbol && mySymbol !== currentPlayer)) return;
+        if (!mySymbol) mySymbol = currentPlayer;
+        
+        channel.publish('move', { index: index, symbol: currentPlayer });
+    }
+
+    function updateStatus() {
+        const status = document.getElementById('status');
+        status.innerText = `Σειρά του: ${currentPlayer} | Είσαι: ${mySymbol || '?'}`;
+    }
+
+    function checkWin() {
+        const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        for (let combo of wins) {
+            const [a, b, c] = combo;
+            if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
+                document.getElementById('status').innerText = "🎉 Νικητής ο " + boardState[a] + "!";
+                document.getElementById('gameBoard').style.pointerEvents = 'none';
+                document.getElementById('resetBtn').style.display = 'inline-block';
             }
-            if (!board.includes(null)) document.getElementById('status').innerText = "Ισοπαλία!";
-            else document.getElementById('status').innerText = (turn === me ? "Σειρά σου!" : "Περίμενε...");
         }
-    </script>
+    }
+</script>
+
 </body>
 </html>
-
